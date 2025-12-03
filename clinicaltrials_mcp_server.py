@@ -31,10 +31,14 @@ MAX_PAGE_SIZE = 1000
 
 class ClinicalTrialsAPI:
     """Client for interacting with ClinicalTrials.gov API v2"""
-    
+
     def __init__(self):
         self.base_url = API_BASE_URL
-        self.client = httpx.AsyncClient(timeout=30.0)
+        headers = {
+            "User-Agent": "ClinicalTrials-MCP-Server/1.0 (https://github.com/aafjes/mcp-clinicaltrials.gov)",
+            "Accept": "application/json"
+        }
+        self.client = httpx.AsyncClient(timeout=30.0, headers=headers)
     
     async def close(self):
         """Close the HTTP client"""
