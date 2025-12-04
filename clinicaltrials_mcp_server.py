@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 from datetime import datetime
 from urllib.parse import urlencode
 
-import httpx
+import requests
 from mcp.server import Server
 from mcp.types import (
     Tool,
@@ -34,15 +34,15 @@ class ClinicalTrialsAPI:
 
     def __init__(self):
         self.base_url = API_BASE_URL
-        headers = {
-            "User-Agent": "ClinicalTrials-MCP-Server/1.0 (https://github.com/aafjes/mcp-clinicaltrials.gov)",
+        self.session = requests.Session()
+        self.session.headers.update({
+            "User-Agent": "Mozilla/5.0 (compatible; ClinicalTrials-MCP-Server/1.0; +https://github.com/aafjes/mcp-clinicaltrials.gov)",
             "Accept": "application/json"
-        }
-        self.client = httpx.AsyncClient(timeout=30.0, headers=headers)
-    
+        })
+
     async def close(self):
-        """Close the HTTP client"""
-        await self.client.aclose()
+        """Close the HTTP session"""
+        await asyncio.to_thread(self.session.close)
     
     async def search_studies(
         self,
@@ -160,9 +160,11 @@ class ClinicalTrialsAPI:
         params["format"] = format
         
         url = f"{self.base_url}/studies"
-        response = await self.client.get(url, params=params)
+        response = await asyncio.to_thread(
+            self.session.get, url, params=params, timeout=30
+        )
         response.raise_for_status()
-        
+
         return response.json()
     
     async def get_study(
@@ -186,9 +188,11 @@ class ClinicalTrialsAPI:
             params["fields"] = "|".join(fields)
         
         url = f"{self.base_url}/studies/{nct_id}"
-        response = await self.client.get(url, params=params)
+        response = await asyncio.to_thread(
+            self.session.get, url, params=params, timeout=30
+        )
         response.raise_for_status()
-        
+
         return response.json()
     
     async def get_study_statistics(
@@ -216,9 +220,11 @@ class ClinicalTrialsAPI:
             params["aggFilters"] = agg_filters
         
         url = f"{self.base_url}/stats"
-        response = await self.client.get(url, params=params)
+        response = await asyncio.to_thread(
+            self.session.get, url, params=params, timeout=30
+        )
         response.raise_for_status()
-        
+
         return response.json()
 
 
@@ -574,7 +580,7 @@ async def call_tool(name: str, arguments: Any) -> List[TextContent]:
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
     
-    except httpx.HTTPStatusError as e:
+    except requests.exceptions.HTTPError as e:
         error_msg = f"HTTP error occurred: {e.response.status_code} - {e.response.text}"
         logger.error(error_msg)
         return [TextContent(type="text", text=error_msg)]
